@@ -7531,19 +7531,25 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
                         showToast('✅ Đã phát thử đủ 2 giọng MC.');
                         return;
                     }
+                    const isVi = langCode.toLowerCase().startsWith('vi');
+                    const viVoices = isVi ? window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().includes('vi')) : [];
                     const voicePick = pickBestHumanVoice(langCode, sample.role);
-                    const voice = voicePick.voice;
+                    const voice = isVi
+                        ? (sample.role === 'female'
+                            ? (viVoices.find(v => /HoaiMy.*Natural/i.test(v.name)) || viVoices.find(v => /HoaiMy|Google/i.test(v.name)) || voicePick.voice)
+                            : (viVoices.find(v => /NamMinh.*Natural/i.test(v.name)) || viVoices.find(v => /NamMinh/i.test(v.name)) || viVoices[1] || voicePick.voice))
+                        : voicePick.voice;
                     const hasRoleVoice = sample.role === 'male' ? voicePick.isTrueMale : voiceMatchesRole(voice, langCode, sample.role);
                     const utter = new SpeechSynthesisUtterance(sample.text);
                     utter.lang = langCode;
                     if (voice) utter.voice = voice;
                     const isEnOrZh = /^(en|zh)/i.test(langCode);
-                    utter.pitch = isEnOrZh && !hasRoleVoice
+                    utter.pitch = isVi ? 1.0 : (isEnOrZh && !hasRoleVoice
                         ? (sample.role === 'male' ? (langCode.toLowerCase().startsWith('zh') ? 0.72 : 0.76) : 1.08)
-                        : (sample.role === 'male' ? 0.96 : 1.08);
-                    utter.rate = sample.role === 'male' && isEnOrZh && !hasRoleVoice
+                        : (sample.role === 'male' ? 0.96 : 1.08));
+                    utter.rate = isVi ? 0.98 : (sample.role === 'male' && isEnOrZh && !hasRoleVoice
                         ? (langCode.toLowerCase().startsWith('zh') ? 0.98 : 0.96)
-                        : 1.02;
+                      : 1.02);
                     utter.onend = () => {
                         sampleIndex++;
                         setTimeout(speakNextSample, sample.role === 'female' ? 450 : 220);
@@ -7690,25 +7696,35 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
 
                     if (status) status.textContent = `🎙️ Đang phát ${line.speaker}...`;
 
-                    const utter = new SpeechSynthesisUtterance(speechText);
+const utter = new SpeechSynthesisUtterance(speechText);
                     utter.lang = activeLang;
-                    if (selectedVoice) utter.voice = selectedVoice;
                     const langPrefix = activeLang.split('-')[0].toLowerCase();
-                    const languageRates = {
-                        vi: { female: 1.08, male: 1.05 },
-                        en: { female: 1.04, male: 1.01 },
-                        zh: { female: 1.05, male: 1.02 }
-                    };
-                    const isZh = langPrefix === 'zh';
-                    const hasRoleVoice = line.role === 'male'
-                        ? voicePick.isTrueMale
-                        : voiceMatchesRole(selectedVoice, activeLang, line.role);
-                    const isMaleFallback = line.role === 'male' && isZh && !voicePick.isTrueMale;
-                    utter.pitch = isMaleFallback ? 0.72 : (line.role === 'male' ? 0.96 : 1.08);
-                    utter.rate = isMaleFallback
-                        ? 0.98
-                        : (languageRates[langPrefix]?.[line.role] || (line.role === 'male' ? 1.02 : 1.05));
-                    if (!hasRoleVoice && !isZh && line.role === 'male') utter.pitch = 0.76;
+                    const isVi = langPrefix === 'vi';
+                    if (isVi) {
+                        const viVoices = window.speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().includes('vi'));
+                        const viVoice = line.role === 'female'
+                            ? (viVoices.find(v => /HoaiMy.*Natural/i.test(v.name)) || viVoices.find(v => /HoaiMy|Google/i.test(v.name)) || selectedVoice)
+                            : (viVoices.find(v => /NamMinh.*Natural/i.test(v.name)) || viVoices.find(v => /NamMinh/i.test(v.name)) || viVoices[1] || selectedVoice);
+                        if (viVoice) utter.voice = viVoice;
+                        utter.pitch = 1.0;
+                        utter.rate = 0.98;
+                    } else {
+                        if (selectedVoice) utter.voice = selectedVoice;
+                        const languageRates = {
+                            en: { female: 1.04, male: 1.01 },
+                            zh: { female: 1.05, male: 1.02 }
+                        };
+                        const isZh = langPrefix === 'zh';
+                        const hasRoleVoice = line.role === 'male'
+                            ? voicePick.isTrueMale
+                            : voiceMatchesRole(selectedVoice, activeLang, line.role);
+                        const isMaleFallback = line.role === 'male' && isZh && !voicePick.isTrueMale;
+                        utter.pitch = isMaleFallback ? 0.72 : (line.role === 'male' ? 0.96 : 1.08);
+                        utter.rate = isMaleFallback
+                            ? 0.98
+                            : (languageRates[langPrefix]?.[line.role] || (line.role === 'male' ? 1.02 : 1.05));
+                        if (!hasRoleVoice && !isZh && line.role === 'male') utter.pitch = 0.76;
+                    }
                     utter.volume = 1.0;
 
                     let finished = false;
