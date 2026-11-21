@@ -2289,8 +2289,8 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
                                 <button type="button" onclick="window.previewPodcastVoices()" class="btn-kahoot w-full py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-[#2563eb] dark:text-blue-300 text-xs font-black hover:bg-blue-50 dark:hover:bg-slate-800">
                                     🔊 Nghe thử 2 giọng MC
                                 </button>
-                                <div id="voice-detected-info" class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-lg leading-relaxed">
-                                    🎙️ Đã bật bộ lọc giọng <strong>Neural Human-like</strong> (Ngắt nhịp thở tự nhiên, phân biệt rõ MC Nam trầm ấm & MC Nữ truyền cảm cho Việt • Anh • Trung)
+                                <div id="voice-detected-info" class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed">
+                                    💡 <strong>Mẹo âm thanh:</strong> Trên <strong>Chrome / Cốc Cốc</strong> hệ thống dùng giọng đọc tiêu chuẩn. Để trải nghiệm trọn vẹn cặp giọng <strong>MC Nam & Nữ Neural</strong> truyền cảm như đài phát thanh, hãy mở trang bằng <strong>Microsoft Edge</strong>.
                                 </div>
                             </div>
 
@@ -7479,6 +7479,7 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
             }
 
             function updateDetectedVoiceBadge() {
+                return;
                 const infoEl = document.getElementById('voice-detected-info');
                 if (!infoEl) return;
                 const preset = document.getElementById('podcast-voice-preset')?.value || state.voicePreset || 'vi-VN|Kore|Charon';
