@@ -3691,19 +3691,23 @@ window.confirmOAuthAccountLink = async function () {
                 showToast('🚪 Đã đăng xuất khỏi hệ thống.');
             };
 
-            // Tự động khôi phục phiên đăng nhập + gói Pro ngay khi mở lại hoặc F5 trang
-            (async function autoRestoreSessionOnBoot() {
-                try {
-                    const savedRaw = localStorage.getItem('edusmart_session_user');
-                    if (savedRaw) {
-                        const saved = JSON.parse(savedRaw);
-                        if (saved && saved.email && typeof window.restoreUserSession === 'function') {
-                            await window.restoreUserSession(saved.name || 'Giáo Viên', saved.email);
+// Tự động khôi phục phiên đăng nhập + gói Pro ngay khi mở lại hoặc F5 trang
+            (function autoRestoreSessionOnBoot() {
+                const runRestore = async () => {
+                    try {
+                        const savedRaw = localStorage.getItem('edusmart_session_user');
+                        if (savedRaw) {
+                            const saved = JSON.parse(savedRaw);
+                            if (saved && saved.email && typeof window.restoreUserSession === 'function') {
+                                await window.restoreUserSession(saved.name || 'Giáo Viên', saved.email);
+                            }
                         }
+                    } catch (e) {
+                        console.warn('Lỗi khôi phục phiên đăng nhập:', e);
                     }
-                } catch (e) {
-                    console.warn('Lỗi khôi phục phiên đăng nhập:', e);
-                }
+                };
+                runRestore();
+                window.addEventListener('edusmart:firebase-ready', runRestore);
             })();
 
             window.toggleProfileDropdown = function (e) {
