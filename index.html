@@ -2766,7 +2766,7 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
     <!-- ================================================================= -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, updateProfile, signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, updateProfile, signOut, GoogleAuthProvider, OAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         window.eduFirebase = {
@@ -2802,6 +2802,14 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
                 window.eduFirebase.user = auth.currentUser;
                 window.eduFirebase.ready = true;
                 window.dispatchEvent(new Event('edusmart:firebase-ready'));
+                onAuthStateChanged(auth, async (user) => {
+    window.eduFirebase.user = user;
+    if (user && user.email) {
+        if (typeof window.restoreUserSession === 'function') {
+            await window.restoreUserSession(user.displayName || 'Giáo Viên', user.email);
+        }
+    }
+});
 
                 const badge = document.getElementById('firebase-conn-badge');
                 if (badge) badge.textContent = 'Đã kết nối đồng bộ';
@@ -3532,6 +3540,32 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
             }
 
             window.syncTopUI = syncTopUI;
+            window.restoreUserSession = async function (name, email) {
+    state.user.isGuest = false;
+    state.user.name = name || 'Giáo Viên';
+    state.user.email = email;
+    state.user.workspace = state.user.name;
+
+    try {
+        if (typeof window.getEduSmartSubscription === 'function') {
+            const sub = await window.getEduSmartSubscription(email);
+            if (sub && sub.isPro && (!sub.proExpiresAt || sub.proExpiresAt > Date.now())) {
+                state.user.isPro = true;
+                state.user.proActivatedAt = sub.proActivatedAt || 0;
+                state.user.proExpiresAt = sub.proExpiresAt || 0;
+                if (typeof sub.coins === 'number') state.coins = sub.coins;
+            } else {
+                state.user.isPro = false;
+            }
+        }
+    } catch (e) {
+        console.warn('Lỗi tải gói Pro từ Firestore:', e);
+    }
+
+    document.getElementById('auth-screen')?.classList.add('hidden');
+    window.switchMainTab('dashboard', true);
+    syncTopUI();
+};
 
             window.navigateBack = function () {
                 if (state.navHistory.length > 1) {
@@ -3619,36 +3653,58 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
                 document.getElementById('oauth-step-1').classList.remove('hidden');
             };
 
-            window.confirmOAuthAccountLink = function () {
-                state.user.isGuest = false;
-                state.user.name = state.oauthPending.name;
-                state.user.email = state.oauthPending.email;
-                state.user.workspace = state.oauthPending.name;
+window.confirmOAuthAccountLink = async function () {
+                const name = state.oauthPending.name;
+                const email = state.oauthPending.email;
+                const provider = state.oauthPending.provider;
                 document.getElementById('modal-oauth-linking').classList.add('hidden');
-                document.getElementById('auth-screen').classList.add('hidden');
-                window.switchMainTab('dashboard');
-                syncTopUI();
-                showToast('🔗 Đã xác nhận liên kết tài khoản ' + state.oauthPending.provider + ' thành công!');
+
+                // Lưu phiên đăng nhập vào trình duyệt để F5 không bị thoát
+                localStorage.setItem('edusmart_session_user', JSON.stringify({ name, email, provider }));
+
+                if (typeof window.restoreUserSession === 'function') {
+                    await window.restoreUserSession(name, email);
+                }
+                showToast('🔗 Đã xác nhận liên kết tài khoản ' + provider + ' thành công!');
             };
 
-            window.handleFormAuthSubmit = function (e) {
+            window.handleFormAuthSubmit = async function (e) {
                 e.preventDefault();
                 const idVal = document.getElementById('auth-input-identifier').value.trim();
-                const nameVal = document.getElementById('auth-input-name').value.trim() || 'Vanh Nguyen';
-                state.user.name = nameVal;
-                state.user.email = idVal;
-                state.user.workspace = nameVal;
-                document.getElementById('auth-screen').classList.add('hidden');
-                window.switchMainTab('dashboard');
-                syncTopUI();
+                const nameVal = document.getElementById('auth-input-name').value.trim() || 'Giáo Viên';
+
+                // Lưu phiên đăng nhập vào trình duyệt để F5 không bị thoát
+                localStorage.setItem('edusmart_session_user', JSON.stringify({ name: nameVal, email: idVal, provider: 'Email' }));
+
+                if (typeof window.restoreUserSession === 'function') {
+                    await window.restoreUserSession(nameVal, idVal);
+                }
                 showToast('👋 Chào mừng ' + state.user.name + ' đến với Trang Chủ Điều Khiển!');
             };
 
-            window.handleLogout = function () {
+            window.handleLogout = async function () {
+                localStorage.removeItem('edusmart_session_user');
+                state.user.isPro = false;
+                state.user.email = '';
                 document.getElementById('fb-profile-dropdown').classList.add('hidden');
                 document.getElementById('auth-screen').classList.remove('hidden');
                 showToast('🚪 Đã đăng xuất khỏi hệ thống.');
             };
+
+            // Tự động khôi phục phiên đăng nhập + gói Pro ngay khi mở lại hoặc F5 trang
+            (async function autoRestoreSessionOnBoot() {
+                try {
+                    const savedRaw = localStorage.getItem('edusmart_session_user');
+                    if (savedRaw) {
+                        const saved = JSON.parse(savedRaw);
+                        if (saved && saved.email && typeof window.restoreUserSession === 'function') {
+                            await window.restoreUserSession(saved.name || 'Giáo Viên', saved.email);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Lỗi khôi phục phiên đăng nhập:', e);
+                }
+            })();
 
             window.toggleProfileDropdown = function (e) {
                 e.stopPropagation();
