@@ -8820,6 +8820,7 @@ const utter = new SpeechSynthesisUtterance(speechText);
             appState.user.proExpiresAt = expiresAt;
             appState.user.renewalReminderSent = Boolean(subscription.renewalReminderSent);
             appState.user.isPro = isActive;
+            if (isActive && typeof subscription.coins === 'number') appState.coins = subscription.coins;
             renderProSubscriptionStatus(subscription, now);
             window.syncTopUI?.();
 
@@ -8949,6 +8950,7 @@ const utter = new SpeechSynthesisUtterance(speechText);
                 appState.user.workspace = appState.user.name;
                 appState.user.isGuest = false;
                 if (window.eduFirebase) window.eduFirebase.user = firebaseUser;
+                localStorage.setItem('edusmart_session_user', JSON.stringify({ name: appState.user.name, email: appState.user.email, provider: 'Email' }));
                 document.getElementById('auth-screen')?.classList.add('hidden');
                 window.switchMainTab?.('dashboard');
                 window.syncTopUI?.();
@@ -9008,6 +9010,7 @@ const utter = new SpeechSynthesisUtterance(speechText);
                 proActivatedAt: now,
                 proExpiresAt,
                 renewalReminderSent: false,
+                coins: appState.coins + (appState.user.isPro ? 0 : 1000),
                 updatedAt: now
             };
             if (!appState.user.isPro) {
@@ -9098,6 +9101,7 @@ const utter = new SpeechSynthesisUtterance(speechText);
                     appState.user.email = firebaseUser.email;
                     appState.user.workspace = appState.user.name;
                     if (window.eduFirebase) window.eduFirebase.user = firebaseUser;
+                    localStorage.setItem('edusmart_session_user', JSON.stringify({ name: appState.user.name, email: appState.user.email, provider: providerName }));
                     document.getElementById('auth-screen')?.classList.add('hidden');
                     window.syncTopUI?.();
                     window.checkProSubscriptionStatus?.();
