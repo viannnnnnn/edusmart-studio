@@ -3540,32 +3540,47 @@ Công thức tính diện tích hình tròn? | S = π × r²"></textarea>
             }
 
             window.syncTopUI = syncTopUI;
-            window.restoreUserSession = async function (name, email) {
-    state.user.isGuest = false;
-    state.user.name = name || 'Giáo Viên';
-    state.user.email = email;
-    state.user.workspace = state.user.name;
+window.restoreUserSession = async function (name, email) {
+                state.user.isGuest = false;
+                state.user.name = name || 'Giáo Viên';
+                state.user.email = email;
+                state.user.workspace = state.user.name;
 
-    try {
-        if (typeof window.getEduSmartSubscription === 'function') {
-            const sub = await window.getEduSmartSubscription(email);
-            if (sub && sub.isPro && (!sub.proExpiresAt || sub.proExpiresAt > Date.now())) {
-                state.user.isPro = true;
-                state.user.proActivatedAt = sub.proActivatedAt || 0;
-                state.user.proExpiresAt = sub.proExpiresAt || 0;
-                if (typeof sub.coins === 'number') state.coins = sub.coins;
-            } else {
-                state.user.isPro = false;
-            }
-        }
-    } catch (e) {
-        console.warn('Lỗi tải gói Pro từ Firestore:', e);
-    }
+                // Lưu phiên đăng nhập để không bao giờ bị null
+                try {
+                    localStorage.setItem('edusmart_session_user', JSON.stringify({ name: state.user.name, email }));
+                } catch (_) {}
 
-    document.getElementById('auth-screen')?.classList.add('hidden');
-    window.switchMainTab('dashboard', true);
-    syncTopUI();
-};
+                // Đọc trước gói Pro & Xu từ localStorage để chạy mượt kể cả khi mạng/Firestore chậm
+                let sub = null;
+                try {
+                    const localRaw = localStorage.getItem(`edusmart:pro-subscription:${String(email).trim().toLowerCase()}`);
+                    if (localRaw) sub = JSON.parse(localRaw);
+                } catch (_) {}
+
+                // Đồng bộ mới nhất từ Firestore nếu đã kết nối
+                try {
+                    if (typeof window.getEduSmartSubscription === 'function' && window.eduFirebase?.ready) {
+                        const remoteSub = await window.getEduSmartSubscription(email);
+                        if (remoteSub) sub = remoteSub;
+                    }
+                } catch (e) {
+                    console.warn('Lỗi tải gói Pro từ Firestore:', e);
+                }
+
+                if (sub && sub.isPro && (!sub.proExpiresAt || sub.proExpiresAt > Date.now())) {
+                    state.user.isPro = true;
+                    state.user.proActivatedAt = sub.proActivatedAt || 0;
+                    state.user.proExpiresAt = sub.proExpiresAt || 0;
+                    if (typeof sub.coins === 'number') state.coins = sub.coins;
+                } else {
+                    state.user.isPro = false;
+                }
+
+                document.getElementById('auth-screen')?.classList.add('hidden');
+                window.switchMainTab('dashboard', true);
+                syncTopUI();
+            };
 
             window.navigateBack = function () {
                 if (state.navHistory.length > 1) {
@@ -3683,6 +3698,7 @@ window.confirmOAuthAccountLink = async function () {
             };
 
             window.handleLogout = async function () {
+                try { await window.signOutFirebaseUser?.(); } catch (_) {}
                 localStorage.removeItem('edusmart_session_user');
                 state.user.isPro = false;
                 state.user.email = '';
